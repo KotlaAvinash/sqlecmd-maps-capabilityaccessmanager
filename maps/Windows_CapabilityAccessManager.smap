@@ -1,0 +1,215 @@
+Description: Windows Capability Access Manager usage history (camera, microphone, location, contacts, screen capture, passkeys)
+Author: whitedevil1026
+Email: 145743158+whitedevil1026@users.noreply.github.com
+Id: 764c5ef9-6fb7-4d8b-8f46-427ab1248dbf
+Version: 1.0
+CSVPrefix: CapabilityAccessManager
+FileName: CapabilityAccessManager.db
+IdentifyQuery: SELECT ((SELECT count(*) FROM pragma_table_info('PackagedUsageHistory') WHERE name IN ('ID','LastUsedTimeStart','LastUsedTimeStop','AccessBlocked','Capability','PackageFamilyName','UserSid','AccessGUID','Label','AppName')) + (SELECT count(*) FROM pragma_table_info('NonPackagedUsageHistory') WHERE name IN ('ID','LastUsedTimeStart','LastUsedTimeStop','AccessBlocked','Capability','FileID','ProgramID','BinaryFullPath','UserSid','AppName','ServiceName','AccessGUID','Label')) + (SELECT count(*) FROM pragma_table_info('NonPackagedIdentityRelationship') WHERE name IN ('ID','BinaryFullPath','FileID','ProgramID','LastObservedTime')) + (SELECT count(*) FROM pragma_table_info('NonPackagedGlobalPromptHistory') WHERE name IN ('ID','ShownTime','Capability','FileID','ProgramID','UserSid')) + (SELECT count(*) FROM pragma_table_info('PackagedGlobalPromptHistory') WHERE name IN ('ID','Capability','UserSid','PackageFamilyName')) + (SELECT count(*) FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type = 'table' AND m.name IN ('Capabilities','PackageFamilyNames','BinaryFullPaths','Users','FileIDs','ProgramIDs','AppNames','ServiceNames','AccessGUIDs') AND p.name IN ('ID','StringValue'))) + (SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('NonPackagedGlobalPromptHistory', 'NonPackagedIdentityRelationship', 'NonPackagedUsageHistory', 'PackagedGlobalPromptHistory', 'PackagedUsageHistory'));
+IdentifyValue: 61
+Queries:
+    -
+        Name: Capability Access Manager Packaged App Usage History
+        Query: |
+                SELECT
+                p.ID AS ID,
+                CASE
+                WHEN typeof( p.LastUsedTimeStart ) IN ( 'integer', 'real' ) AND p.LastUsedTimeStart > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', p.LastUsedTimeStart / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( p.LastUsedTimeStart / 10000 % 1000 ), -3 )
+                END AS LastUsedTimeStartUTC,
+                CASE
+                WHEN typeof( p.LastUsedTimeStop ) IN ( 'integer', 'real' ) AND p.LastUsedTimeStop > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', p.LastUsedTimeStop / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( p.LastUsedTimeStop / 10000 % 1000 ), -3 )
+                END AS LastUsedTimeStopUTC,
+                CASE
+                WHEN typeof( p.LastUsedTimeStart ) = 'integer' AND typeof( p.LastUsedTimeStop ) = 'integer' AND p.LastUsedTimeStart > 0 AND p.LastUsedTimeStop > 0 AND p.LastUsedTimeStop >= p.LastUsedTimeStart THEN
+                round( ( p.LastUsedTimeStop - p.LastUsedTimeStart ) / 10000000.0, 3 )
+                END AS DurationSeconds,
+                CASE WHEN p.Capability = 0 THEN NULL ELSE COALESCE( cap.StringValue, 'Unresolved ID ' || p.Capability ) END AS Capability,
+                CASE WHEN p.AppName = 0 THEN NULL ELSE COALESCE( app.StringValue, 'Unresolved ID ' || p.AppName ) END AS AppName,
+                CASE WHEN p.PackageFamilyName = 0 THEN NULL ELSE COALESCE( pfn.StringValue, 'Unresolved ID ' || p.PackageFamilyName ) END AS PackageFamilyName,
+                CASE WHEN p.UserSid = 0 THEN NULL ELSE COALESCE( usr.StringValue, 'Unresolved ID ' || p.UserSid ) END AS UserSid,
+                CASE
+                WHEN p.AccessBlocked = 0 THEN
+                'No'
+                WHEN p.AccessBlocked = 1 THEN
+                'Yes' ELSE p.AccessBlocked
+                END AS AccessBlocked,
+                CASE WHEN p.AccessGUID = 0 THEN NULL ELSE COALESCE( guid.StringValue, 'Unresolved ID ' || p.AccessGUID ) END AS AccessGUID,
+                p.Label AS Label,
+                CAST( p.LastUsedTimeStart AS TEXT ) AS LastUsedTimeStartRaw,
+                CAST( p.LastUsedTimeStop AS TEXT ) AS LastUsedTimeStopRaw
+                FROM
+                PackagedUsageHistory p
+                LEFT JOIN Capabilities cap ON cap.ID = p.Capability
+                LEFT JOIN AppNames app ON app.ID = p.AppName
+                LEFT JOIN PackageFamilyNames pfn ON pfn.ID = p.PackageFamilyName
+                LEFT JOIN Users usr ON usr.ID = p.UserSid
+                LEFT JOIN AccessGUIDs guid ON guid.ID = p.AccessGUID
+                ORDER BY
+                p.LastUsedTimeStart ASC,
+                p.ID ASC
+        BaseFileName: PackagedUsageHistory
+    -
+        Name: Capability Access Manager Non-Packaged (Desktop) App Usage History
+        Query: |
+                SELECT
+                n.ID AS ID,
+                CASE
+                WHEN typeof( n.LastUsedTimeStart ) IN ( 'integer', 'real' ) AND n.LastUsedTimeStart > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', n.LastUsedTimeStart / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( n.LastUsedTimeStart / 10000 % 1000 ), -3 )
+                END AS LastUsedTimeStartUTC,
+                CASE
+                WHEN typeof( n.LastUsedTimeStop ) IN ( 'integer', 'real' ) AND n.LastUsedTimeStop > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', n.LastUsedTimeStop / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( n.LastUsedTimeStop / 10000 % 1000 ), -3 )
+                END AS LastUsedTimeStopUTC,
+                CASE
+                WHEN typeof( n.LastUsedTimeStart ) = 'integer' AND typeof( n.LastUsedTimeStop ) = 'integer' AND n.LastUsedTimeStart > 0 AND n.LastUsedTimeStop > 0 AND n.LastUsedTimeStop >= n.LastUsedTimeStart THEN
+                round( ( n.LastUsedTimeStop - n.LastUsedTimeStart ) / 10000000.0, 3 )
+                END AS DurationSeconds,
+                CASE WHEN n.Capability = 0 THEN NULL ELSE COALESCE( cap.StringValue, 'Unresolved ID ' || n.Capability ) END AS Capability,
+                CASE WHEN n.AppName = 0 THEN NULL ELSE COALESCE( app.StringValue, 'Unresolved ID ' || n.AppName ) END AS AppName,
+                CASE WHEN n.BinaryFullPath = 0 THEN NULL ELSE COALESCE( bfp.StringValue, 'Unresolved ID ' || n.BinaryFullPath ) END AS BinaryFullPath,
+                CASE WHEN n.FileID = 0 THEN NULL ELSE COALESCE( fid.StringValue, 'Unresolved ID ' || n.FileID ) END AS FileID,
+                CASE
+                WHEN length( fid.StringValue ) = 44 AND substr( fid.StringValue, 1, 4 ) = '0000' THEN
+                substr( fid.StringValue, 5 )
+                END AS FileIDSHA1,
+                CASE WHEN n.ProgramID = 0 THEN NULL ELSE COALESCE( pid.StringValue, 'Unresolved ID ' || n.ProgramID ) END AS ProgramID,
+                CASE WHEN n.UserSid = 0 THEN NULL ELSE COALESCE( usr.StringValue, 'Unresolved ID ' || n.UserSid ) END AS UserSid,
+                CASE WHEN n.ServiceName = 0 THEN NULL ELSE COALESCE( svc.StringValue, 'Unresolved ID ' || n.ServiceName ) END AS ServiceName,
+                CASE
+                WHEN n.AccessBlocked = 0 THEN
+                'No'
+                WHEN n.AccessBlocked = 1 THEN
+                'Yes' ELSE n.AccessBlocked
+                END AS AccessBlocked,
+                CASE WHEN n.AccessGUID = 0 THEN NULL ELSE COALESCE( guid.StringValue, 'Unresolved ID ' || n.AccessGUID ) END AS AccessGUID,
+                n.Label AS Label,
+                CASE
+                WHEN io.t > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', io.t / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( io.t / 10000 % 1000 ), -3 )
+                END AS IdentityLastObservedTimeUTC,
+                CAST( n.LastUsedTimeStart AS TEXT ) AS LastUsedTimeStartRaw,
+                CAST( n.LastUsedTimeStop AS TEXT ) AS LastUsedTimeStopRaw
+                FROM
+                NonPackagedUsageHistory n
+                LEFT JOIN Capabilities cap ON cap.ID = n.Capability
+                LEFT JOIN AppNames app ON app.ID = n.AppName
+                LEFT JOIN BinaryFullPaths bfp ON bfp.ID = n.BinaryFullPath
+                LEFT JOIN FileIDs fid ON fid.ID = n.FileID
+                LEFT JOIN ProgramIDs pid ON pid.ID = n.ProgramID
+                LEFT JOIN Users usr ON usr.ID = n.UserSid
+                LEFT JOIN ServiceNames svc ON svc.ID = n.ServiceName
+                LEFT JOIN AccessGUIDs guid ON guid.ID = n.AccessGUID
+                LEFT JOIN ( SELECT FileID, BinaryFullPath, min( LastObservedTime ) AS t FROM NonPackagedIdentityRelationship WHERE LastObservedTime > 0 AND FileID <> 0 GROUP BY FileID, BinaryFullPath ) io ON io.FileID = n.FileID AND io.BinaryFullPath = n.BinaryFullPath
+                ORDER BY
+                n.LastUsedTimeStart ASC,
+                n.ID ASC
+        BaseFileName: NonPackagedUsageHistory
+    -
+        Name: Capability Access Manager Non-Packaged Binary Identities
+        Query: |
+                SELECT
+                r.ID AS ID,
+                CASE
+                WHEN typeof( r.LastObservedTime ) IN ( 'integer', 'real' ) AND r.LastObservedTime > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', r.LastObservedTime / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( r.LastObservedTime / 10000 % 1000 ), -3 )
+                END AS LastObservedTimeUTC,
+                CASE WHEN r.BinaryFullPath = 0 THEN NULL ELSE COALESCE( bfp.StringValue, 'Unresolved ID ' || r.BinaryFullPath ) END AS BinaryFullPath,
+                CASE WHEN r.FileID = 0 THEN NULL ELSE COALESCE( fid.StringValue, 'Unresolved ID ' || r.FileID ) END AS FileID,
+                CASE
+                WHEN length( fid.StringValue ) = 44 AND substr( fid.StringValue, 1, 4 ) = '0000' THEN
+                substr( fid.StringValue, 5 )
+                END AS FileIDSHA1,
+                CASE WHEN r.ProgramID = 0 THEN NULL ELSE COALESCE( pid.StringValue, 'Unresolved ID ' || r.ProgramID ) END AS ProgramID,
+                COALESCE( uc.c, 0 ) AS UsageRows,
+                COALESCE( pc.c, 0 ) AS PromptRows,
+                CASE
+                WHEN pc.t > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', pc.t / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( pc.t / 10000 % 1000 ), -3 )
+                END AS FirstPromptShownTimeUTC,
+                CAST( r.LastObservedTime AS TEXT ) AS LastObservedTimeRaw
+                FROM
+                NonPackagedIdentityRelationship r
+                LEFT JOIN BinaryFullPaths bfp ON bfp.ID = r.BinaryFullPath
+                LEFT JOIN FileIDs fid ON fid.ID = r.FileID
+                LEFT JOIN ProgramIDs pid ON pid.ID = r.ProgramID
+                LEFT JOIN ( SELECT FileID, BinaryFullPath, count( * ) AS c FROM NonPackagedUsageHistory GROUP BY FileID, BinaryFullPath ) uc ON uc.FileID = r.FileID AND uc.BinaryFullPath = r.BinaryFullPath
+                LEFT JOIN ( SELECT FileID, count( * ) AS c, min( CASE WHEN ShownTime > 0 THEN ShownTime END ) AS t FROM NonPackagedGlobalPromptHistory WHERE FileID <> 0 GROUP BY FileID ) pc ON pc.FileID = r.FileID
+                ORDER BY
+                r.LastObservedTime ASC,
+                r.ID ASC
+        BaseFileName: NonPackagedIdentityRelationship
+    -
+        Name: Capability Access Manager Non-Packaged Global Prompt History
+        Query: |
+                SELECT
+                g.ID AS ID,
+                CASE
+                WHEN typeof( g.ShownTime ) IN ( 'integer', 'real' ) AND g.ShownTime > 0 THEN
+                strftime( '%Y-%m-%d %H:%M:%S', g.ShownTime / 10000000 - 11644473600, 'unixepoch' ) || '.' || substr( '00' || ( g.ShownTime / 10000 % 1000 ), -3 )
+                END AS ShownTimeUTC,
+                CASE WHEN g.Capability = 0 THEN NULL ELSE COALESCE( cap.StringValue, 'Unresolved ID ' || g.Capability ) END AS Capability,
+                ip.p AS IdentityBinaryFullPath,
+                CASE WHEN g.FileID = 0 THEN NULL ELSE COALESCE( fid.StringValue, 'Unresolved ID ' || g.FileID ) END AS FileID,
+                CASE
+                WHEN length( fid.StringValue ) = 44 AND substr( fid.StringValue, 1, 4 ) = '0000' THEN
+                substr( fid.StringValue, 5 )
+                END AS FileIDSHA1,
+                CASE WHEN g.ProgramID = 0 THEN NULL ELSE COALESCE( pid.StringValue, 'Unresolved ID ' || g.ProgramID ) END AS ProgramID,
+                CASE WHEN g.UserSid = 0 THEN NULL ELSE COALESCE( usr.StringValue, 'Unresolved ID ' || g.UserSid ) END AS UserSid,
+                CAST( g.ShownTime AS TEXT ) AS ShownTimeRaw
+                FROM
+                NonPackagedGlobalPromptHistory g
+                LEFT JOIN Capabilities cap ON cap.ID = g.Capability
+                LEFT JOIN FileIDs fid ON fid.ID = g.FileID
+                LEFT JOIN ProgramIDs pid ON pid.ID = g.ProgramID
+                LEFT JOIN ( SELECT r.FileID AS FileID, group_concat( COALESCE( bp.StringValue, 'Unresolved ID ' || r.BinaryFullPath ), ' | ' ) AS p FROM NonPackagedIdentityRelationship r LEFT JOIN BinaryFullPaths bp ON bp.ID = r.BinaryFullPath WHERE r.FileID <> 0 GROUP BY r.FileID ) ip ON ip.FileID = g.FileID
+                LEFT JOIN Users usr ON usr.ID = g.UserSid
+                ORDER BY
+                g.ID ASC
+        BaseFileName: NonPackagedGlobalPromptHistory
+    -
+        Name: Capability Access Manager Packaged Global Prompt History
+        Query: |
+                SELECT
+                g.ID AS ID,
+                CASE WHEN g.Capability = 0 THEN NULL ELSE COALESCE( cap.StringValue, 'Unresolved ID ' || g.Capability ) END AS Capability,
+                CASE WHEN g.PackageFamilyName = 0 THEN NULL ELSE COALESCE( pfn.StringValue, 'Unresolved ID ' || g.PackageFamilyName ) END AS PackageFamilyName,
+                CASE WHEN g.UserSid = 0 THEN NULL ELSE COALESCE( usr.StringValue, 'Unresolved ID ' || g.UserSid ) END AS UserSid
+                FROM
+                PackagedGlobalPromptHistory g
+                LEFT JOIN Capabilities cap ON cap.ID = g.Capability
+                LEFT JOIN PackageFamilyNames pfn ON pfn.ID = g.PackageFamilyName
+                LEFT JOIN Users usr ON usr.ID = g.UserSid
+                ORDER BY
+                g.ID ASC
+        BaseFileName: PackagedGlobalPromptHistory
+
+# Documentation
+# CapabilityAccessManager.db sits in C:\ProgramData\Microsoft\Windows\CapabilityAccessManager\ (Windows 11). The folder is set by HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\CapabilityUsageHistory\DatabaseRoot.
+# Tested on a current Windows 11 build (October 2026). CapabilityConsentStorage.db in the same folder has its own map, Windows_CapabilityConsentStorage.smap.
+# https://medium.com/@cyber.sundae.dfir/capabilityaccessmanager-db-deep-dive-part-1-ff49f69c58af
+# https://medium.com/@cyber.sundae.dfir/capabilityaccessmanager-db-deep-dive-part-2-e44fd9b92933
+# https://medium.com/@cyber.sundae.dfir/capabilityaccessmanager-db-deep-dive-part-3-801092e1ead9
+#
+# The history tables store integers that point into lookup tables (ID, StringValue). Every query resolves them with LEFT JOINs, so no row is dropped.
+# A value of 0 is shown empty, and a FileID of 0 is never used to link usage, identity and prompt rows. An ID with no lookup row (the lookup value was purged) is shown as "Unresolved ID n"; it is never guessed.
+# All times are FILETIME, in UTC. They are shown to the millisecond, truncated with integer arithmetic (never rounded up). The full 100 ns value is kept in the *Raw columns. A time of 0 is shown empty.
+# AccessBlocked 0 = No (access allowed), 1 = Yes (blocked).
+# DurationSeconds is stop minus start. For screen capture it can be a fixed hold time, so it is not necessarily the real length of the capture.
+# Label and AccessGUID are undocumented and shown raw.
+# Counts and first/last times from the related tables are grouped once and joined, so the queries stay fast on large databases.
+# FileID is the Amcache FileId: 0000 followed by the SHA-1 of the first 31,457,280 bytes of the binary. FileIDSHA1 is that SHA-1.
+# https://blog.nviso.eu/2022/03/07/amcache-contains-sha-1-hash-it-depends/
+# FileID is copied from Amcache when the row is written, so it can describe a newer version of the binary than the one that ran.
+# NonPackagedIdentityRelationship.LastObservedTime is in practice the first time Windows saw that binary identity. IdentityLastObservedTimeUTC repeats it on each usage row with the same path and FileID.
+# NonPackagedGlobalPromptHistory has one row each time Windows showed a capability prompt (usually location) for a new binary identity. IdentityBinaryFullPath is filled only when the FileID also has an identity row.
+# The identity and prompt tables can keep rows much longer than usage history, which is pruned by age and by count (ExpirationPolicyInDays and MaximumSizeOnWrite in the registry key above). A missing usage row is not proof that nothing happened.
+# The newest use of an app can also be in the ConsentStore registry (LastUsedTimeStart / LastUsedTimeStop under HKCU and HKLM ...\CapabilityAccessManager\ConsentStore). Check both.
+# Newer builds add a Context column (and a BinaryName column to NonPackagedGlobalPromptHistory) by ALTER TABLE. This map does not read them, so it also matches databases created before they were added.
+#
+# Collect the -wal and -shm with the database. The most recent usage rows can be in the -wal only.
+# SQLite may checkpoint the -wal into the database when it is opened read-write, and the checkpoint can truncate the file. Pages past the logical end of the database can hold deleted usage rows, and a checkpoint destroys them. Run SQLECmd on copies only.
+# SQLECmd notes: run it on copies, because it writes -shm/-wal files beside the input. It skips locked or hot-journal databases and ignores a WAL whose header does not match, both without an error exit code. It has no query timeout. It converts a value whose stored type differs from the column's declared type (text in an INTEGER column becomes 0 or its leading number), so the *Raw columns are cast to text to keep the stored value. Open the CSVs as text (or in Timeline Explorer): cells keep values exactly as stored, including leading = + - @ and NUL characters.

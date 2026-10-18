@@ -1,0 +1,100 @@
+Description: Windows Capability Access Manager consent decisions (Allow / Deny / Prompt per capability, user, app, device and site)
+Author: whitedevil1026
+Email: 145743158+whitedevil1026@users.noreply.github.com
+Id: 923e824b-4cef-4fff-a0f3-3b38921a281e
+Version: 1.0
+CSVPrefix: CapabilityAccessManager
+FileName: CapabilityConsentStorage.db
+IdentifyQuery: SELECT ((SELECT count(*) FROM pragma_table_info('SystemGlobal') WHERE name IN ('Capability','Value')) + (SELECT count(*) FROM pragma_table_info('UserGlobal') WHERE name IN ('Capability','User','Value')) + (SELECT count(*) FROM pragma_table_info('ClassicGlobal') WHERE name IN ('Capability','User','Value')) + (SELECT count(*) FROM pragma_table_info('App') WHERE name IN ('Capability','User','PackageFamily','Value')) + (SELECT count(*) FROM pragma_table_info('UserGlobalWithConsentID') WHERE name IN ('Capability','User','ConsentID','Value')) + (SELECT count(*) FROM pragma_table_info('ClassicGlobalWithConsentID') WHERE name IN ('Capability','User','ConsentID','Value')) + (SELECT count(*) FROM pragma_table_info('AppWithConsentID') WHERE name IN ('Capability','User','PackageFamily','ConsentID','Value')) + (SELECT count(*) FROM pragma_table_info('ShowGlobalPrompts') WHERE name IN ('Capability','User','Value')) + (SELECT count(*) FROM pragma_table_info('MigratedUsers') WHERE name IN ('User','Value'))) + (SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name IN ('App', 'AppWithConsentID', 'ClassicGlobal', 'ClassicGlobalWithConsentID', 'MigratedUsers', 'ShowGlobalPrompts', 'SystemGlobal', 'UserGlobal', 'UserGlobalWithConsentID'));
+IdentifyValue: 39
+Queries:
+    -
+        Name: Capability Access Manager Consent Decisions
+        Query: |
+                SELECT
+                d.Scope AS Scope,
+                d.ScopeDescription AS ScopeDescription,
+                d.Capability AS Capability,
+                d.User AS UserSid,
+                d.PackageFamily AS PackageFamily,
+                d.ConsentID AS ConsentID,
+                CASE
+                WHEN d.Value = 1 THEN
+                'Allow'
+                WHEN d.Value = 2 THEN
+                'Deny'
+                WHEN d.Value = 3 THEN
+                'Prompt' ELSE 'Unknown'
+                END AS Decision,
+                CASE
+                WHEN d.Scope IN ( 'SystemGlobal', 'UserGlobal', 'App' ) THEN
+                'Yes' ELSE 'No'
+                END AS DecodeChecked,
+                CAST( d.Value AS TEXT ) AS ValueRaw
+                FROM
+                (
+                SELECT 'SystemGlobal' AS Scope, 'Machine-wide default' AS ScopeDescription, Capability, NULL AS User, NULL AS PackageFamily, NULL AS ConsentID, Value FROM SystemGlobal
+                UNION ALL
+                SELECT 'UserGlobal', 'Per-user switch for the capability', Capability, User, NULL, NULL, Value FROM UserGlobal
+                UNION ALL
+                SELECT 'ClassicGlobal', 'Per-user switch for desktop apps', Capability, User, NULL, NULL, Value FROM ClassicGlobal
+                UNION ALL
+                SELECT 'App', 'Per-user decision for one app', Capability, User, PackageFamily, NULL, Value FROM App
+                UNION ALL
+                SELECT 'UserGlobalWithConsentID', 'Per-user decision for one device or site', Capability, User, NULL, ConsentID, Value FROM UserGlobalWithConsentID
+                UNION ALL
+                SELECT 'ClassicGlobalWithConsentID', 'Per-user decision for one device or site, desktop apps', Capability, User, NULL, ConsentID, Value FROM ClassicGlobalWithConsentID
+                UNION ALL
+                SELECT 'AppWithConsentID', 'Per-user decision for one device or site, one app', Capability, User, PackageFamily, ConsentID, Value FROM AppWithConsentID
+                ) d
+                ORDER BY
+                d.Scope ASC,
+                d.User ASC,
+                d.Capability ASC,
+                d.PackageFamily ASC,
+                d.ConsentID ASC
+        BaseFileName: ConsentDecisions
+    -
+        Name: Capability Access Manager Consent Show Global Prompts
+        Query: |
+                SELECT
+                ShowGlobalPrompts.Capability AS Capability,
+                ShowGlobalPrompts.User AS UserSid,
+                CAST( ShowGlobalPrompts.Value AS TEXT ) AS ValueRaw
+                FROM
+                ShowGlobalPrompts
+                ORDER BY
+                ShowGlobalPrompts.User ASC,
+                ShowGlobalPrompts.Capability ASC
+        BaseFileName: ConsentShowGlobalPrompts
+    -
+        Name: Capability Access Manager Consent Migrated Users
+        Query: |
+                SELECT
+                MigratedUsers.User AS UserSid,
+                CAST( MigratedUsers.Value AS TEXT ) AS ValueRaw
+                FROM
+                MigratedUsers
+                ORDER BY
+                MigratedUsers.User ASC
+        BaseFileName: ConsentMigratedUsers
+
+# Documentation
+# CapabilityConsentStorage.db sits next to CapabilityAccessManager.db in C:\ProgramData\Microsoft\Windows\CapabilityAccessManager\ (Windows 11).
+# Tested on a current Windows 11 build (October 2026). The usage history has its own map, Windows_CapabilityAccessManager.smap.
+# It mirrors the ConsentStore registry keys:
+# HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore and the same path under HKCU.
+#
+# Value: 1 = Allow, 2 = Deny, 3 = Prompt. Any other value is shown as Unknown, with the number in ValueRaw.
+# This decode was checked against the live ConsentStore registry for the SystemGlobal, UserGlobal and App tables, and every value matched.
+# ClassicGlobal and the *WithConsentID tables use the same column, but their decode has not been checked against the registry. DecodeChecked says No for those rows.
+#
+# ConsentDecisions combines the seven decision tables. Scope is the source table.
+# SystemGlobal is the machine default (HKLM). UserGlobal is the per-user switch for a capability. ClassicGlobal is the "Let desktop apps access ..." switch.
+# App holds one decision per user, capability and package family.
+# The *WithConsentID tables hold decisions for one device or site. UserGlobalWithConsentID can list paired Bluetooth devices (ConsentID Bluetooth#Bluetooth<adapter MAC>-<device MAC>, or BluetoothLE#BluetoothLE... for a Bluetooth LE device) and passkey relying parties (web sites).
+# ConsentShowGlobalPrompts: whether the global prompt is enabled per account and capability. Value is shown raw.
+# ConsentMigratedUsers: accounts migrated into the database. It can list local accounts that have no usage history. Value is shown raw.
+# These are current settings, not history: the database has no timestamps. Usage history is in CapabilityAccessManager.db.
+# Collect the -wal and -shm with the database, and run SQLECmd on copies only.
+# SQLECmd notes: run it on copies, because it writes -shm/-wal files beside the input. It skips locked or hot-journal databases and ignores a WAL whose header does not match, both without an error exit code. It has no query timeout. It converts a value whose stored type differs from the column's declared type (text in an INTEGER column becomes 0 or its leading number), so the *Raw columns are cast to text to keep the stored value. Open the CSVs as text (or in Timeline Explorer): cells keep values exactly as stored, including leading = + - @ and NUL characters.
