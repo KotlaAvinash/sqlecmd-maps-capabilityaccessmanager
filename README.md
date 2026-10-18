@@ -69,7 +69,7 @@ python tests/stress.py C:\Tools\SQLECmd.exe                        # large synth
 
 ## Related
 
-- Phone Link maps are a separate repo: [sqlecmd-maps-phonelink](https://github.com/whitedevil1026/sqlecmd-maps-phonelink).
+- Phone Link maps (and a relations viewer) are a separate repo: [phonelink-forensics](https://github.com/whitedevil1026/phonelink-forensics).
 - For carving deleted CAM rows and WAL slack, see [CAMtool](https://github.com/whitedevil1026/CAMtool).
 
 ## Credits
