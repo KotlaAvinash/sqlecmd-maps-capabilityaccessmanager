@@ -1,6 +1,6 @@
 Description: Windows Capability Access Manager usage history (camera, microphone, location, contacts, screen capture, passkeys)
-Author: whitedevil1026
-Email: 145743158+whitedevil1026@users.noreply.github.com
+Author: Kotla Avinash
+Email: 145743158+KotlaAvinash@users.noreply.github.com
 Id: 764c5ef9-6fb7-4d8b-8f46-427ab1248dbf
 Version: 1.0
 CSVPrefix: CapabilityAccessManager

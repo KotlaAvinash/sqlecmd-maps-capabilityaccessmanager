@@ -69,8 +69,8 @@ python tests/stress.py C:\Tools\SQLECmd.exe                        # large synth
 
 ## Related
 
-- Phone Link maps (and a relations viewer) are a separate repo: [phone-link-forensics](https://github.com/whitedevil1026/phone-link-forensics).
-- For carving deleted CAM rows and WAL slack, see [CAMtool](https://github.com/whitedevil1026/CAMtool).
+- Phone Link maps (and a relations viewer) are a separate repo: [phone-link-forensics](https://github.com/KotlaAvinash/phone-link-forensics).
+- For carving deleted CAM rows and WAL slack, see [CAMtool](https://github.com/KotlaAvinash/CAMtool).
 
 ## Credits
 

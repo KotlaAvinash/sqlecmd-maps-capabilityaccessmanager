@@ -1,6 +1,6 @@
 Description: Windows Capability Access Manager consent decisions (Allow / Deny / Prompt per capability, user, app, device and site)
-Author: whitedevil1026
-Email: 145743158+whitedevil1026@users.noreply.github.com
+Author: Kotla Avinash
+Email: 145743158+KotlaAvinash@users.noreply.github.com
 Id: 923e824b-4cef-4fff-a0f3-3b38921a281e
 Version: 1.0
 CSVPrefix: CapabilityAccessManager
