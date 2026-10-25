@@ -29,7 +29,7 @@ Deliberate breakages make the suite fail:
 On a real Windows 11 system, the maps ran through SQLECmd on **copies** of the CAM databases. The originals were hashed before and after, and were unchanged.
 
 - **Independent query run:** every query's output was compared cell by cell with an independent Python `sqlite3` run of the same SQL. 0 mismatched cells.
-- **Independent tool:** rows match the CAMtool parser.
+- **Independent tool:** rows match the WinWitness parser.
 - **Consent decode:** checked against the live ConsentStore registry for the scopes marked `DecodeChecked = Yes`.
 - **Alignment:** every CSV row is aligned with its header.
 
